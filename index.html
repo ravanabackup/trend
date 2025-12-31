@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Google Trends India – Live RSS</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+:root {
+    --primary: #4f46e5;
+    --secondary: #06b6d4;
+    --surface: #1e293b;
+    --background: #0f172a;
+    --on-surface: #e5e7eb;
+    --on-background: #f9fafb;
+    --error: #ef4444;
+}
+
+body {
+    margin: 0;
+    font-family: "Google Sans", Arial, Helvetica, sans-serif;
+    background: var(--background);
+    color: var(--on-surface);
+    transition: background 0.3s, color 0.3s;
+}
+
+/* Debug bar */
+#debug {
+    background: linear-gradient(90deg, var(--primary), var(--secondary));
+    color: #fff;
+    font-size: 12px;
+    text-align: center;
+    padding: 6px;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    animation: gradientMove 6s infinite alternate;
+}
+@keyframes gradientMove {
+    from { background-position: 0% 50%; }
+    to { background-position: 100% 50%; }
+}
+
+/* Header */
+header {
+    padding: 20px;
+    background: var(--primary);
+    text-align: center;
+    color: #fff;
+    border-bottom-left-radius: 24px;
+    border-bottom-right-radius: 24px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+header h1 {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 600;
+}
+#lastUpdate {
+    font-size: 13px;
+    color: #e0e7ff;
+    margin-top: 6px;
+}
+
+/* Sort controls */
+#sortControls {
+    text-align: center;
+    margin: 15px;
+}
+#sortControls button {
+    background: var(--secondary);
+    border: none;
+    color: #fff;
+    padding: 8px 14px;
+    margin: 0 6px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.25);
+    transition: background 0.3s;
+}
+#sortControls button:hover {
+    background: var(--primary);
+}
+
+/* Container */
+.container {
+    max-width: 900px;
+    margin: auto;
+    padding: 20px;
+}
+
+/* Trend cards */
+.trend {
+    background: var(--surface);
+    border-radius: 20px;
+    margin-bottom: 20px;
+    overflow: hidden;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.25);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.trend:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.35);
+}
+.trend-header {
+    display: flex;
+    gap: 15px;
+    padding: 20px;
+}
+.trend-header img {
+    width: 90px;
+    height: 90px;
+    border-radius: 16px;
+    object-fit: cover;
+    background: #334155;
+    flex-shrink: 0;
+}
+.trend-info {
+    flex: 1;
+}
+.trend-info h2 {
+    margin: 0 0 8px;
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--on-background);
+}
+.meta {
+    font-size: 13px;
+    color: #94a3b8;
+    margin-bottom: 6px;
+}
+.badge {
+    display: inline-block;
+    margin-top: 8px;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: bold;
+    border-radius: 20px;
+    background: var(--secondary);
+    color: white;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+}
+
+/* News items */
+.news {
+    background: #0f172a;
+    padding: 12px 20px;
+    border-top: 1px solid #334155;
+}
+.news-item {
+    display: flex;
+    gap: 14px;
+    margin-bottom: 14px;
+    align-items: center;
+    transition: background 0.2s;
+    border-radius: 12px;
+    padding: 6px;
+}
+.news-item:hover {
+    background: rgba(255,255,255,0.05);
+}
+.news-item img {
+    width: 56px;
+    height: 56px;
+    border-radius: 10px;
+    object-fit: cover;
+    background: #1e293b;
+    flex-shrink: 0;
+}
+.news-content {
+    display: flex;
+    flex-direction: column;
+}
+.news-content a {
+    color: var(--secondary);
+    text-decoration: none;
+    font-size: 15px;
+    font-weight: 500;
+    line-height: 1.4;
+}
+.news-content a:hover {
+    text-decoration: underline;
+}
+.news-content span {
+    font-size: 12px;
+    color: #94a3b8;
+    margin-top: 2px;
+}
+
+/* Preloader spinner */
+#preloader {
+    display: none;
+    text-align: center;
+    margin: 20px;
+}
+.spinner {
+    border: 4px solid #334155;
+    border-top: 4px solid var(--secondary);
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    animation: spin 1s linear infinite;
+    margin: auto;
+}
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Dark mode toggle */
+#darkToggle {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    padding: 10px 14px;
+    border-radius: 50px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    transition: background 0.3s;
+}
+#darkToggle:hover {
+    background: var(--secondary);
+}
+
+/* Light mode */
+.light-mode {
+    --background: #f9fafb;
+    --surface: #ffffff;
+    --on-surface: #111827;
+    --on-background: #111827;
+}
+.light-mode header {
+    background: var(--primary);
+    color: #fff;
+}
+.light-mode .news {
+    background: #f3f4f6;
+}
+.light-mode .news-content a {
+    color: var(--primary);
+}
+</style>
+</head>
+
+<body>
+<div id="debug">Status: Idle</div>
+
+<header>
+    <h1>Google Trends India 🇮🇳 (Live)</h1>
+    <div id="lastUpdate">Loading…</div>
+</header>
+
+<div id="sortControls">
+    <button onclick="sortFeed('recent')">Sort by Recent</button>
+    <button onclick="sortFeed('strength')">Sort by Trending Strength</button>
+</div>
+
+<div id="preloader"><div class="spinner"></div></div>
+
+<div class="container" id="feed">
+    <p style="text-align:center; color: #94a3b8;">Loading trends...</p>
+</div>
+
+<button id="darkToggle">Toggle Theme</button>
+
+<script>
+const PROXY = "https://api.allorigins.win/raw?url=";
+const RSS_URL = "https://trends.google.com/trending/rss?geo=IN&sort=recency";
+const REFRESH_TIME = 60000; // 1 minute
+
+const debugBox = document.getElementById("debug");
+const preloader = document.getElementById("preloader");
+let trendsData = [];
+
+const getVal = (parent, tag) => {
+    let el = parent.getElementsByTagName(tag)[0];
+    if (!el) el = parent.getElementsByTagName("ht:" + tag)[0];
+    return el ? el.textContent : "";
+};
+
+// Extract dominant color from image using canvas
+function extractColor(imgUrl, callback) {
+    const img = new Image();
+    img.crossOrigin = "Anonymous";
+    img.src = imgUrl;
+    img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0);
+        const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data
+        const length = data.length;
+        let r = 0, g = 0, b = 0, count = 0;
+        for (let i = 0; i < length; i += 40) { // sample every 40th pixel
+            r += data[i];
+            g += data[i + 1];
+            b += data[i + 2];
+            count++;
+        }
+        r = Math.floor(r / count);
+        g = Math.floor(g / count);
+        b = Math.floor(b / count);
+        callback(`rgb(${r},${g},${b})`);
+    };
+}
+
+async function loadFeed() {
+    try {
+        debugBox.textContent = "Status: Fetching…";
+        preloader.style.display = "block";
+
+        const response = await fetch(PROXY + encodeURIComponent(RSS_URL));
+        if (!response.ok) throw new Error("Network response was not ok");
+
+        const text = await response.text();
+        const xml = new DOMParser().parseFromString(text, "text/xml");
+        const items = xml.querySelectorAll("item");
+        const feed = document.getElementById("feed");
+
+        if (items.length === 0) {
+            feed.innerHTML = "<p style='text-align:center'>No trends found.</p>";
+            debugBox.textContent = "Status: Not Got";
+            preloader.style.display = "none";
+            return;
+        }
+
+        trendsData = [];
+        feed.innerHTML = "";
+        items.forEach(item => {
+            const title = item.querySelector("title")?.textContent || "No Title";
+            const pubDate = item.querySelector("pubDate")?.textContent || "";
+            const traffic = getVal(item, "approx_traffic");
+            const image = getVal(item, "picture");
+            const imageSource = getVal(item, "picture_source");
+
+            const trendObj = {
+                title,
+                pubDate: new Date(pubDate),
+                traffic: traffic ? parseInt(traffic.replace(/,/g, "")) : 0,
+                image,
+                imageSource,
+                news: []
+            };
+
+            const newsList = item.getElementsByTagName("ht:news_item").length
+                ? item.getElementsByTagName("ht:news_item")
+                : item.getElementsByTagName("news_item");
+
+            Array.from(newsList).forEach(n => {
+                trendObj.news.push({
+                    title: getVal(n, "news_item_title"),
+                    url: getVal(n, "news_item_url"),
+                    img: getVal(n, "news_item_picture"),
+                    source: getVal(n, "news_item_source")
+                });
+            });
+
+            trendsData.push(trendObj);
+        });
+
+        renderFeed(trendsData);
+
+        document.getElementById("lastUpdate").textContent =
+            "Last updated: " + new Date().toLocaleTimeString();
+
+        debugBox.textContent = "Status: Got";
+        preloader.style.display = "none";
+
+    } catch (e) {
+        document.getElementById("feed").innerHTML =
+            `<p style='text-align:center; color:var(--error)'>
+                Failed to load feed.<br>
+                <small>${e.message}</small>
+            </p>`;
+        debugBox.textContent = "Status: Not Got";
+        preloader.style.display = "none";
+        console.error(e);
+    }
+}
+
+function renderFeed(data) {
+    const feed = document.getElementById("feed");
+    feed.innerHTML = "";
+
+    data.forEach(trend => {
+        const trendDiv = document.createElement("div");
+        trendDiv.className = "trend";
+
+        let html = `
+            <div class="trend-header">
+                <img src="${trend.image}" onerror="this.style.opacity=0">
+                <div class="trend-info">
+                    <h2>${trend.title}</h2>
+                    <div class="meta">${trend.pubDate.toLocaleString()}</div>
+                    ${trend.traffic ? `<div class="badge">🔥 ${trend.traffic}+ searches</div>` : ""}
+                    ${trend.imageSource ? `<div class="meta" style="margin-top:5px">Source: ${trend.imageSource}</div>` : ""}
+                </div>
+            </div>
+            <div class="news">
+        `;
+
+        trend.news.forEach(n => {
+            html += `
+                <div class="news-item">
+                    ${n.img ? `<img src="${n.img}" onerror="this.style.display='none'">` : ''}
+                    <div class="news-content">
+                        <a href="${n.url}" target="_blank">${n.title}</a>
+                        <span>${n.source}</span>
+                    </div>
+                </div>
+            `;
+        });
+
+        html += `</div>`;
+        trendDiv.innerHTML = html;
+        feed.appendChild(trendDiv);
+
+        // Apply dynamic accent gradient based on image color
+        if (trend.image) {
+            extractColor(trend.image, color => {
+                trendDiv.style.border = `3px solid ${color}`;
+                trendDiv.style.boxShadow = `0 6px 16px ${color}`;
+            });
+        }
+    });
+}
+
+function sortFeed(type) {
+    if (type === "recent") {
+        trendsData.sort((a, b) => b.pubDate - a.pubDate);
+    } else if (type === "strength") {
+        trendsData.sort((a, b) => b.traffic - a.traffic);
+    }
+    renderFeed(trendsData);
+}
+
+loadFeed();
+setInterval(loadFeed, REFRESH_TIME);
+
+// Dark mode toggle
+document.getElementById("darkToggle").addEventListener("click", () => {
+    document.body.classList.toggle("light-mode");
+});
+</script>
+
+</body>
+</html>
