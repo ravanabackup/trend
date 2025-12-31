@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Google Trends RSS – India (Live)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+body {
+    margin: 0;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    background: #0f172a;
+    color: #e5e7eb;
+}
+
+header {
+    padding: 16px;
+    background: #020617;
+    text-align: center;
+    font-size: 1.3rem;
+    font-weight: 600;
+}
+
+#lastUpdate {
+    font-size: 0.85rem;
+    color: #94a3b8;
+}
+
+.container {
+    padding: 16px;
+    max-width: 900px;
+    margin: auto;
+}
+
+.trend {
+    background: #020617;
+    border-radius: 14px;
+    margin-bottom: 20px;
+    overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+}
+
+.trend-header {
+    display: flex;
+    gap: 12px;
+    padding: 14px;
+}
+
+.trend-header img {
+    width: 90px;
+    height: 90px;
+    border-radius: 10px;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.trend-info h2 {
+    margin: 0;
+    font-size: 1.1rem;
+}
+
+.meta {
+    font-size: 0.85rem;
+    color: #94a3b8;
+}
+
+.badge {
+    display: inline-block;
+    margin-top: 6px;
+    padding: 4px 8px;
+    font-size: 0.75rem;
+    border-radius: 6px;
+    background: #1e293b;
+}
+
+.news {
+    border-top: 1px solid #1e293b;
+    padding: 12px 14px;
+}
+
+.news-item {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.news-item img {
+    width: 70px;
+    height: 70px;
+    border-radius: 8px;
+    object-fit: cover;
+}
+
+.news-item a {
+    color: #38bdf8;
+    text-decoration: none;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.news-item span {
+    display: block;
+    font-size: 0.75rem;
+    color: #94a3b8;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+Google Trends – India 🇮🇳 (Live RSS)
+<div id="lastUpdate"></div>
+</header>
+
+<div class="container" id="feed"></div>
+
+<script>
+const RSS_URL = "https://trends.google.com/trending/rss?geo=IN&sort=recency";
+const CORS_PROXY = "https://cors.kawiesh.top/";
+const REFRESH_INTERVAL = 60000; // 60 seconds
+
+async function loadRSS() {
+    try {
+        const res = await fetch(CORS_PROXY + RSS_URL);
+        const text = await res.text();
+        const xml = new DOMParser().parseFromString(text, "text/xml");
+        const items = xml.querySelectorAll("item");
+        const feed = document.getElementById("feed");
+
+        feed.innerHTML = "";
+
+        items.forEach(item => {
+            const title = item.querySelector("title")?.textContent || "";
+            const pubDate = item.querySelector("pubDate")?.textContent || "";
+            const traffic = item.querySelector("ht\\:approx_traffic")?.textContent || "";
+            const image = item.querySelector("ht\\:picture")?.textContent || "";
+            const imageSource = item.querySelector("ht\\:picture_source")?.textContent || "";
+
+            const trendDiv = document.createElement("div");
+            trendDiv.className = "trend";
+
+            trendDiv.innerHTML = `
+                <div class="trend-header">
+                    <img src="${image}" loading="lazy">
+                    <div class="trend-info">
+                        <h2>${title}</h2>
+                        <div class="meta">${pubDate}</div>
+                        <div class="badge">🔥 ${traffic} searches</div>
+                        <div class="meta">Image: ${imageSource}</div>
+                    </div>
+                </div>
+                <div class="news"></div>
+            `;
+
+            const newsContainer = trendDiv.querySelector(".news");
+            const newsItems = item.querySelectorAll("ht\\:news_item");
+
+            newsItems.forEach(n => {
+                const nTitle = n.querySelector("ht\\:news_item_title")?.textContent || "";
+                const nUrl = n.querySelector("ht\\:news_item_url")?.textContent || "";
+                const nImg = n.querySelector("ht\\:news_item_picture")?.textContent || "";
+                const nSource = n.querySelector("ht\\:news_item_source")?.textContent || "";
+
+                const newsDiv = document.createElement("div");
+                newsDiv.className = "news-item";
+
+                newsDiv.innerHTML = `
+                    <img src="${nImg}" loading="lazy">
+                    <div>
+                        <a href="${nUrl}" target="_blank" rel="noopener">${nTitle}</a>
+                        <span>${nSource}</span>
+                    </div>
+                `;
+
+                newsContainer.appendChild(newsDiv);
+            });
+
+            feed.appendChild(trendDiv);
+        });
+
+        document.getElementById("lastUpdate").textContent =
+            "Last updated: " + new Date().toLocaleTimeString();
+
+    } catch (err) {
+        console.error("RSS fetch failed:", err);
+    }
+}
+
+loadRSS();
+setInterval(loadRSS, REFRESH_INTERVAL);
+</script>
+
+</body>
+</html>
