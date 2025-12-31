@@ -2,65 +2,66 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Google Trends RSS – India (Live)</title>
+<title>Google Trends India – Live RSS</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
 body {
     margin: 0;
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: Arial, Helvetica, sans-serif;
     background: #0f172a;
     color: #e5e7eb;
 }
 
 header {
-    padding: 16px;
+    padding: 15px;
     background: #020617;
     text-align: center;
-    font-size: 1.3rem;
-    font-weight: 600;
+}
+
+header h1 {
+    margin: 0;
+    font-size: 20px;
 }
 
 #lastUpdate {
-    font-size: 0.85rem;
+    font-size: 12px;
     color: #94a3b8;
 }
 
 .container {
-    padding: 16px;
     max-width: 900px;
     margin: auto;
+    padding: 15px;
 }
 
 .trend {
     background: #020617;
-    border-radius: 14px;
-    margin-bottom: 20px;
+    border-radius: 12px;
+    margin-bottom: 18px;
     overflow: hidden;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.4);
 }
 
 .trend-header {
     display: flex;
     gap: 12px;
-    padding: 14px;
+    padding: 12px;
 }
 
 .trend-header img {
     width: 90px;
     height: 90px;
-    border-radius: 10px;
+    border-radius: 8px;
     object-fit: cover;
-    flex-shrink: 0;
 }
 
 .trend-info h2 {
-    margin: 0;
-    font-size: 1.1rem;
+    margin: 0 0 6px;
+    font-size: 16px;
 }
 
 .meta {
-    font-size: 0.85rem;
+    font-size: 12px;
     color: #94a3b8;
 }
 
@@ -68,39 +69,39 @@ header {
     display: inline-block;
     margin-top: 6px;
     padding: 4px 8px;
-    font-size: 0.75rem;
+    font-size: 11px;
     border-radius: 6px;
     background: #1e293b;
 }
 
 .news {
     border-top: 1px solid #1e293b;
-    padding: 12px 14px;
+    padding: 10px 12px;
 }
 
 .news-item {
     display: flex;
     gap: 10px;
-    margin-bottom: 12px;
+    margin-bottom: 10px;
 }
 
 .news-item img {
-    width: 70px;
-    height: 70px;
-    border-radius: 8px;
+    width: 65px;
+    height: 65px;
+    border-radius: 6px;
     object-fit: cover;
 }
 
 .news-item a {
     color: #38bdf8;
     text-decoration: none;
-    font-size: 0.9rem;
-    font-weight: 500;
+    font-size: 13px;
+    font-weight: bold;
 }
 
 .news-item span {
     display: block;
-    font-size: 0.75rem;
+    font-size: 11px;
     color: #94a3b8;
 }
 </style>
@@ -109,21 +110,24 @@ header {
 <body>
 
 <header>
-Google Trends – India 🇮🇳 (Live RSS)
-<div id="lastUpdate"></div>
+    <h1>Google Trends India 🇮🇳 (Live)</h1>
+    <div id="lastUpdate">Loading…</div>
 </header>
 
-<div class="container" id="feed"></div>
+<div class="container" id="feed">
+    Loading trends…
+</div>
 
 <script>
 const RSS_URL = "https://trends.google.com/trending/rss?geo=IN&sort=recency";
-const CORS_PROXY = "https://cors.kawiesh.top/";
-const REFRESH_INTERVAL = 60000; // 60 seconds
+const PROXY = "https://cors.kawiesh.top/";
+const REFRESH_TIME = 60000; // 1 minute
 
-async function loadRSS() {
+async function loadFeed() {
     try {
-        const res = await fetch(CORS_PROXY + RSS_URL);
-        const text = await res.text();
+        const response = await fetch(PROXY + RSS_URL);
+        const text = await response.text();
+
         const xml = new DOMParser().parseFromString(text, "text/xml");
         const items = xml.querySelectorAll("item");
         const feed = document.getElementById("feed");
@@ -142,12 +146,12 @@ async function loadRSS() {
 
             trendDiv.innerHTML = `
                 <div class="trend-header">
-                    <img src="${image}" loading="lazy">
+                    <img src="${image}" onerror="this.style.display='none'">
                     <div class="trend-info">
                         <h2>${title}</h2>
                         <div class="meta">${pubDate}</div>
-                        <div class="badge">🔥 ${traffic} searches</div>
-                        <div class="meta">Image: ${imageSource}</div>
+                        ${traffic ? `<div class="badge">🔥 ${traffic} searches</div>` : ""}
+                        ${imageSource ? `<div class="meta">Image source: ${imageSource}</div>` : ""}
                     </div>
                 </div>
                 <div class="news"></div>
@@ -166,9 +170,9 @@ async function loadRSS() {
                 newsDiv.className = "news-item";
 
                 newsDiv.innerHTML = `
-                    <img src="${nImg}" loading="lazy">
+                    <img src="${nImg}" onerror="this.style.display='none'">
                     <div>
-                        <a href="${nUrl}" target="_blank" rel="noopener">${nTitle}</a>
+                        <a href="${nUrl}" target="_blank">${nTitle}</a>
                         <span>${nSource}</span>
                     </div>
                 `;
@@ -182,13 +186,15 @@ async function loadRSS() {
         document.getElementById("lastUpdate").textContent =
             "Last updated: " + new Date().toLocaleTimeString();
 
-    } catch (err) {
-        console.error("RSS fetch failed:", err);
+    } catch (e) {
+        document.getElementById("feed").innerHTML =
+            "<p style='color:red'>Failed to load feed.</p>";
+        console.error(e);
     }
 }
 
-loadRSS();
-setInterval(loadRSS, REFRESH_INTERVAL);
+loadFeed();
+setInterval(loadFeed, REFRESH_TIME);
 </script>
 
 </body>
