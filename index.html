@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Google Trends India – Live RSS</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+body {
+    margin: 0;
+    font-family: Arial, Helvetica, sans-serif;
+    background: #0f172a;
+    color: #e5e7eb;
+}
+
+/* Debug bar */
+#debug {
+    background: #1e293b;
+    color: #38bdf8;
+    font-size: 12px;
+    text-align: center;
+    padding: 4px;
+    border-bottom: 1px solid #334155;
+}
+
+/* Header */
+header {
+    padding: 15px;
+    background: #020617;
+    text-align: center;
+    border-bottom: 1px solid #1e293b;
+}
+header h1 {
+    margin: 0;
+    font-size: 20px;
+}
+#lastUpdate {
+    font-size: 12px;
+    color: #94a3b8;
+    margin-top: 5px;
+}
+
+/* Container */
+.container {
+    max-width: 900px;
+    margin: auto;
+    padding: 15px;
+}
+
+/* Trend cards */
+.trend {
+    background: #1e293b;
+    border-radius: 12px;
+    margin-bottom: 18px;
+    overflow: hidden;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+.trend-header {
+    display: flex;
+    gap: 15px;
+    padding: 15px;
+}
+.trend-header img {
+    width: 80px;
+    height: 80px;
+    border-radius: 8px;
+    object-fit: cover;
+    background: #334155;
+    flex-shrink: 0;
+}
+.trend-info {
+    flex: 1;
+}
+.trend-info h2 {
+    margin: 0 0 6px;
+    font-size: 18px;
+    color: #fff;
+}
+.meta {
+    font-size: 12px;
+    color: #94a3b8;
+    margin-bottom: 5px;
+}
+.badge {
+    display: inline-block;
+    margin-top: 6px;
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: bold;
+    border-radius: 20px;
+    background: #3b82f6;
+    color: white;
+}
+
+/* News items */
+.news {
+    background: #0f172a;
+    padding: 10px 15px;
+    border-top: 1px solid #334155;
+}
+.news-item {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 12px;
+    text-decoration: none;
+    align-items: center;
+}
+.news-item:last-child {
+    margin-bottom: 0;
+}
+.news-item img {
+    width: 50px;
+    height: 50px;
+    border-radius: 6px;
+    object-fit: cover;
+    background: #1e293b;
+    flex-shrink: 0;
+}
+.news-content {
+    display: flex;
+    flex-direction: column;
+}
+.news-content a {
+    color: #38bdf8;
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.4;
+}
+.news-content a:hover {
+    text-decoration: underline;
+}
+.news-content span {
+    font-size: 11px;
+    color: #94a3b8;
+    margin-top: 2px;
+}
+
+/* Preloader spinner */
+#preloader {
+    display: none;
+    text-align: center;
+    margin: 20px;
+}
+.spinner {
+    border: 4px solid #334155;
+    border-top: 4px solid #38bdf8;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    animation: spin 1s linear infinite;
+    margin: auto;
+}
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Dark mode toggle */
+#darkToggle {
+    position: fixed;
+    bottom: 15px;
+    right: 15px;
+    background: #334155;
+    color: #fff;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+}
+.light-mode {
+    background: #f9fafb;
+    color: #111827;
+}
+.light-mode header {
+    background: #e5e7eb;
+}
+.light-mode .trend {
+    background: #f3f4f6;
+}
+.light-mode .news {
+    background: #fff;
+}
+.light-mode .news-content a {
+    color: #2563eb;
+}
+</style>
+</head>
+
+<body>
+<div id="debug">Status: Idle</div>
+
+<header>
+    <h1>Google Trends India 🇮🇳 (Live)</h1>
+    <div id="lastUpdate">Loading…</div>
+</header>
+
+<div id="preloader"><div class="spinner"></div></div>
+
+<div class="container" id="feed">
+    <p style="text-align:center; color: #94a3b8;">Loading trends...</p>
+</div>
+
+<button id="darkToggle">Toggle Dark Mode</button>
+
+<script>
+const PROXY = "https://api.allorigins.win/raw?url=";
+const RSS_URL = "https://trends.google.com/trending/rss?geo=IN&sort=recency";
+const REFRESH_TIME = 60000; // 1 minute
+
+const debugBox = document.getElementById("debug");
+const preloader = document.getElementById("preloader");
+
+// Helper to safely get text content from XML tags
+const getVal = (parent, tag) => {
+    let el = parent.getElementsByTagName(tag)[0];
+    if (!el) el = parent.getElementsByTagName("ht:" + tag)[0];
+    return el ? el.textContent : "";
+};
+
+async function loadFeed() {
+    try {
+        debugBox.textContent = "Status: Fetching...";
+        preloader.style.display = "block";
+
+        const response = await fetch(PROXY + encodeURIComponent(RSS_URL));
+        if (!response.ok) throw new Error("Network response was not ok");
+
+        const text = await response.text();
+        const xml = new DOMParser().parseFromString(text, "text/xml");
+        const items = xml.querySelectorAll("item");
+        const feed = document.getElementById("feed");
+
+        if (items.length === 0) {
+            feed.innerHTML = "<p style='text-align:center'>No trends found.</p>";
+            debugBox.textContent = "Status: Not Got";
+            preloader.style.display = "none";
+            return;
+        }
+
+        feed.innerHTML = "";
+        items.forEach(item => {
+            const title = item.querySelector("title")?.textContent || "No Title";
+            const pubDate = item.querySelector("pubDate")?.textContent || "";
+            const traffic = getVal(item, "approx_traffic");
+            const image = getVal(item, "picture");
+            const imageSource = getVal(item, "picture_source");
+
+            const trendDiv = document.createElement("div");
+            trendDiv.className = "trend";
+
+            let html = `
+                <div class="trend-header">
+                    <img src="${image}" onerror="this.style.opacity=0">
+                    <div class="trend-info">
+                        <h2>${title}</h2>
+                        <div class="meta">${new Date(pubDate).toLocaleString()}</div>
+                        ${traffic ? `<div class="badge">🔥 ${traffic}+ searches</div>` : ""}
+                        ${imageSource ? `<div class="meta" style="margin-top:5px">Source: ${imageSource}</div>` : ""}
+                    </div>
+                </div>
+                <div class="news">
+            `;
+
+            const newsList = item.getElementsByTagName("ht:news_item").length
+                ? item.getElementsByTagName("ht:news_item")
+                : item.getElementsByTagName("news_item");
+
+            Array.from(newsList).forEach(n => {
+                const nTitle = getVal(n, "news_item_title");
+                const nUrl = getVal(n, "news_item_url");
+                const nImg = getVal(n, "news_item_picture");
+                const nSource = getVal(n, "news_item_source");
+
+                html += `
+                    <div class="news-item">
+                        ${nImg ? `<img src="${nImg}" onerror="this.style.display='none'">` : ''}
+                        <div class="news-content">
+                            <a href="${nUrl}" target="_blank">${nTitle}</a>
+                            <span>${nSource}</span>
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += `</div>`;
+            trendDiv.innerHTML = html;
+            feed.appendChild(trendDiv);
+        });
+
+        document.getElementById("lastUpdate").textContent =
+            "Last updated: " + new Date().toLocaleTimeString();
+
+        debugBox.textContent = "Status: Got";
+        preloader.style.display = "none";
+
+    } catch (e) {
+        document.getElementById("feed").innerHTML =
+            `<p style='text-align:center; color:#ef4444'>
+                Failed to load feed.<br>
+                <small>${e.message}</small>
+            </p>`;
+        debugBox.textContent = "Status: Not Got";
+        preloader.style.display = "none";
+        console.error(e);
+    }
+}
+
+loadFeed();
+setInterval(loadFeed, REFRESH_TIME);
+
+// Dark mode toggle
+document.getElementById("darkToggle").addEventListener("click", () => {
+    document.body.classList.toggle("light-mode");
+});
+</script>
+
+</body>
+</html>
