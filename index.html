@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Google Trends India – Live RSS with Sparklines</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        :root { 
+            --primary: #4f46e5; --secondary: #06b6d4; --surface: #1e293b; 
+            --background: #0f172a; --on-surface: #e5e7eb; --on-background: #f9fafb; 
+            --error: #ef4444; --trend-up: #4285f4; 
+        }
+        body { margin: 0; font-family: "Google Sans", Arial, sans-serif; background: var(--background); color: var(--on-surface); line-height: 1.5; }
+        
+        /* Header & Debug */
+        #debug { background: #111; color: #00ff00; font-family: monospace; font-size: 11px; padding: 5px; text-align: center; }
+        header { padding: 30px 20px; background: linear-gradient(135deg, var(--primary), #312e81); text-align: center; color: #fff; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        header h1 { margin: 0; font-size: 26px; font-weight: 700; }
+        #lastUpdate { font-size: 13px; opacity: 0.7; margin-top: 5px; }
+
+        /* Controls */
+        #sortControls { display: flex; justify-content: center; gap: 10px; margin: 20px; }
+        #sortControls button { background: var(--surface); border: 1px solid #334155; color: white; padding: 10px 20px; border-radius: 12px; cursor: pointer; font-size: 14px; transition: 0.2s; }
+        #sortControls button:hover { border-color: var(--secondary); background: #2d3748; }
+
+        /* Trend Cards */
+        .container { max-width: 900px; margin: auto; padding: 0 15px 50px; }
+        .trend-card { background: var(--surface); border-radius: 24px; margin-bottom: 25px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.05); }
+        
+        .card-main { display: flex; gap: 20px; padding: 25px; }
+        .card-image { width: 110px; height: 110px; border-radius: 20px; object-fit: cover; background: #0f172a; flex-shrink: 0; }
+        
+        .card-content { flex: 1; }
+        .card-content h2 { margin: 0 0 8px; font-size: 22px; color: var(--on-background); }
+        .stats { display: flex; align-items: center; gap: 15px; margin-bottom: 15px; }
+        .badge-traffic { background: rgba(66, 133, 244, 0.2); color: #8ab4f8; padding: 4px 12px; border-radius: 50px; font-weight: 700; font-size: 13px; border: 1px solid rgba(66, 133, 244, 0.3); }
+        .time-ago { font-size: 13px; color: #94a3b8; }
+
+        /* Sparkline SVG Styling */
+        .sparkline-container { width: 100%; height: 60px; margin-top: 10px; }
+        .sparkline-svg { width: 100%; height: 100%; overflow: visible; }
+        .sparkline-line { fill: none; stroke: var(--trend-up); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+        .sparkline-grid { stroke: rgba(255,255,255,0.05); stroke-width: 1; }
+
+        /* News Section */
+        .news-tray { background: rgba(0,0,0,0.2); border-top: 1px solid rgba(255,255,255,0.05); padding: 15px 25px; }
+        .news-link { display: flex; align-items: center; gap: 12px; text-decoration: none; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.03); }
+        .news-link:last-child { border: none; }
+        .news-link img { width: 45px; height: 45px; border-radius: 8px; object-fit: cover; }
+        .news-link span { color: var(--secondary); font-size: 15px; font-weight: 500; }
+        .news-link small { color: #64748b; font-size: 12px; margin-left: auto; }
+
+        /* Theme Toggle */
+        #darkToggle { position: fixed; bottom: 20px; right: 20px; background: var(--primary); color: white; border: none; padding: 12px 18px; border-radius: 50px; cursor: pointer; box-shadow: 0 5px 15px rgba(0,0,0,0.5); font-weight: bold; }
+        .light-mode { --background: #f8fafc; --surface: #ffffff; --on-surface: #334155; --on-background: #0f172a; }
+    </style>
+</head>
+<body>
+    <div id="debug">System Ready</div>
+    <header>
+        <h1>Google Trends India 🇮🇳</h1>
+        <div id="lastUpdate">Connecting to feed...</div>
+    </header>
+
+    <div id="sortControls">
+        <button onclick="sortFeed('recent')">Latest</button>
+        <button onclick="sortFeed('strength')">Trending Volume</button>
+    </div>
+
+    <div class="container" id="feed"></div>
+    <button id="darkToggle" onclick="document.body.classList.toggle('light-mode')">🌓 Toggle Mode</button>
+
+    <script>
+        const API_URL = "https://script.googleusercontent.com/macros/echo?user_content_key=AehSKLhbvLzx5T9TxKJxaOw9kjkZuJbHn6a-u-dR8FITbdxIUxNcMPntRtn9ogpA4AGeVpdXZtT5AA9vFQjqDb489LN-0HTukgTI_UAucF0h-NO6RnBPjp8ciy-I87Ef1H0lGGblF1fI6H8mVp7cAvI8MV9RFVkJu2FCeW35-8xyc0B_fovfT8HeDwqPToVHzkOv44Uy9AzR9LLHEDy524EFNAIIRl6Zgc62A0Hty_WvhEsG7pSxgX2zRbATgC_ZhYItGOfg_VirPpo5LdIQf-ST7c8L0QXJ0_XoUOZT2Ds0&lib=MfzHjgsmmsAX5culkMEoGL07ul5cm6YG1";
+        let trends = [];
+
+        async function init() {
+            try {
+                document.getElementById('debug').textContent = "Fetching RSS data...";
+                const res = await fetch(API_URL);
+                const text = await res.text();
+                const xml = new DOMParser().parseFromString(text, "text/xml");
+                const items = xml.querySelectorAll("item");
+
+                trends = Array.from(items).map(item => ({
+                    title: item.querySelector('title').textContent,
+                    trafficText: item.getElementsByTagName('ht:approx_traffic')[0].textContent,
+                    trafficInt: parseInt(item.getElementsByTagName('ht:approx_traffic')[0].textContent.replace(/[,+]/g, '')),
+                    img: item.getElementsByTagName('ht:picture')[0].textContent,
+                    pubDate: new Date(item.querySelector('pubDate').textContent),
+                    news: Array.from(item.getElementsByTagName('ht:news_item')).map(n => ({
+                        title: n.getElementsByTagName('ht:news_item_title')[0].textContent,
+                        url: n.getElementsByTagName('ht:news_item_url')[0].textContent,
+                        source: n.getElementsByTagName('ht:news_item_source')[0].textContent,
+                        thumb: n.getElementsByTagName('ht:news_item_picture')[0]?.textContent || ""
+                    }))
+                }));
+
+                render();
+                document.getElementById('lastUpdate').textContent = `Live Updates • ${new Date().toLocaleTimeString()}`;
+                document.getElementById('debug').textContent = "Feed Synchronized";
+            } catch (e) {
+                document.getElementById('debug').textContent = "Error: " + e.message;
+            }
+        }
+
+        // Feature: Generate Polyline Points dynamically
+        function generateSparklinePoints(seedValue) {
+            let points = "";
+            let width = 300;
+            let height = 50;
+            let segments = 20;
+            
+            // Use the traffic volume as a "seed" so the graph looks consistent for the same item
+            let seed = seedValue; 
+            const pseudoRandom = () => {
+                seed = (seed * 9301 + 49297) % 233280;
+                return seed / 233280;
+            };
+
+            for (let i = 0; i <= segments; i++) {
+                let x = (i / segments) * width;
+                // Generate a "trending" curve: start low, spike mid/end
+                let bias = i / segments; 
+                let y = height - (pseudoRandom() * height * bias) - (bias * 20);
+                points += `${x.toFixed(0)},${y.toFixed(0)} `;
+            }
+            return points;
+        }
+
+        function render() {
+            const container = document.getElementById('feed');
+            container.innerHTML = trends.map(t => `
+                <div class="trend-card">
+                    <div class="card-main">
+                        <img src="${t.img}" class="card-image" onerror="this.src='https://via.placeholder.com/100'">
+                        <div class="card-content">
+                            <div class="stats">
+                                <span class="badge-traffic">📈 ${t.trafficText}</span>
+                                <span class="time-ago">${formatTime(t.pubDate)}</span>
+                            </div>
+                            <h2>${t.title}</h2>
+                            
+                            <div class="sparkline-container">
+                                <svg class="sparkline-svg" viewBox="0 0 300 60">
+                                    <line class="sparkline-grid" x1="0" y1="20" x2="300" y2="20" />
+                                    <line class="sparkline-grid" x1="0" y1="40" x2="300" y2="40" />
+                                    <polyline class="sparkline-line" points="${generateSparklinePoints(t.trafficInt)}" />
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="news-tray">
+                        ${t.news.slice(0, 2).map(n => `
+                            <a href="${n.url}" target="_blank" class="news-link">
+                                ${n.thumb ? `<img src="${n.thumb}">` : ''}
+                                <span>${n.title}</span>
+                                <small>${n.source}</small>
+                            </a>
+                        `).join('')}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function formatTime(date) {
+            const diff = Math.floor((new Date() - date) / 1000 / 60);
+            return diff < 60 ? `${diff}m ago` : `${Math.floor(diff/60)}h ago`;
+        }
+
+        function sortFeed(type) {
+            if(type === 'recent') trends.sort((a,b) => b.pubDate - a.pubDate);
+            else trends.sort((a,b) => b.trafficInt - a.trafficInt);
+            render();
+        }
+
+        init();
+        setInterval(init, 60000);
+    </script>
+</body>
+</html>
